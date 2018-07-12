@@ -1,3 +1,3 @@
 # LearningMachine
 
-LearningMachine
+PNU Graduate Assignment
