@@ -91,15 +91,18 @@ def save_images(images, filename, output_dir):
 def fgs_attack(model, x_input, input_img):
     wrap = KerasModelWrapper(model)
     eps = 2.0 * 16 / 255.0
+    #eps = 0.1 
     fgsm = FastGradientMethod(wrap)
     x_adv = fgsm.generate(x_input, eps=eps, clip_min=-1., clip_max=1.)
-    for i in range(10):
+    adv_image = sess.run(x_adv, feed_dict={x_input: input_img})
+
+    for i in range(3):
         print('iter:', i)
         if i == 0:
             adv_image = sess.run(x_adv, feed_dict={x_input: input_img})
         else:
             adv_image = sess.run(x_adv, feed_dict={x_input: adv_image})
-
+    print('adv_image shape:', adv_image.shape)
     return adv_image
 
 input_image = image.load_img(IMAGE_PATH, target_size=(IMAGE_SIZE, IMAGE_SIZE)) 
@@ -114,11 +117,9 @@ d = discriminator()
 
 import time
 start_time = time.time() 
-print('attack is start.')
 res = fgs_attack(d, x_input, x)
-print('attack is end.')
 print("--- %s seconds ---" %(time.time() - start_time))
-#print(res.shape)
+print(res.shape)
 
 # show the results.
 print("************************************************")
@@ -130,7 +131,7 @@ print(decode_predictions(preds, top=3)[0])
 
 d_img = deprocess(res[0]).astype(np.uint8)
 sv_img = Image.fromarray(d_img)
-sv_img.save("fgsm_res.png")
+sv_img.save("./output/fgsm_res.png")
 
 #plot_results(input_image, adversarial, adversarial-x[0])
 #save_images(deprocess(adversarial), 'res.png', 'output')

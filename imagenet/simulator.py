@@ -46,19 +46,23 @@ def show_predictions(d, x, n=3):
     preds = d.predict(x)
     print(decode_predictions(preds, top=n)[0])
 
-def save_images(images, filename, output_dir):
-    img = Image.fromarray(images.astype(np.uint8))
-    img.save("res.png")
-    #with tf.gfile.Open(os.path.join(output_dir, filename), 'w') as f:
-    #    Image.fromarray(images).save(f, format='PNG')
-
 def attack(model, x_input, input_img):
     wrap = KerasModelWrapper(model)
+    cw_params = {'binary_search_steps': 1,
+                    'max_iterations': 5,
+                    'learning_rate': 2e-3,
+                    'batch_size': 1,
+                    'initial_const': 0.1,
+                    'confidence' : 0,
+                    'clip_min': -1.,
+                    'clip_max': 1.}
     cw = CarliniWagnerL2(wrap, sess=sess)
-    print('generating graph..')
-    adv = cw.generate(x=x_input, clip_min=-1., clip_max=1., max_iterations=5)
-    print('generating adv img..')
+    adv = cw.generate(x=x_input, initial_const=0.1,
+                        learning_rate=2e-3, clip_min=-1., clip_max=1., max_iterations=5)
     adv_img = sess.run(adv, feed_dict={x_input: input_img})
+    #for i in range(2):
+    #    print('iter:', i)
+    #    adv_img = sess.run(adv, feed_dict={x_input: adv_img})
     return adv_img
 
 input_image = image.load_img(IMAGE_PATH, target_size=(IMAGE_SIZE, IMAGE_SIZE)) 
@@ -71,20 +75,10 @@ x_input = tf.placeholder(tf.float32, shape=img_shape)
 d = discriminator()
 show_predictions(d,x)
 
-
-# iterative fast gradient sign attack
-# original image, discriminator, number of iterations, epsilon
-#eps = 2.0 * 16 / 255.0
-#adversarial = iterative_attack(x,d,2,eps=eps)
-#print(adversarial.shape)
-
 import time
 start_time = time.time() 
-print('attack is start.')
 res = attack(d, x_input, x)
-print('attack is end.')
 print("--- %s seconds ---" %(time.time() - start_time))
-#print(res.shape)
 
 # show the results.
 print("************************************************")
@@ -96,5 +90,5 @@ print(decode_predictions(preds, top=3)[0])
 
 d_img = deprocess(res[0]).astype(np.uint8)
 sv_img = Image.fromarray(d_img)
-sv_img.save("cw_res.png")
+sv_img.save("./output/cw_res.png")
 

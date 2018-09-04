@@ -6,7 +6,7 @@ from __future__ import print_function
 
 import os
 
-from cleverhans.attacks import FastGradientMethod
+from cleverhans.attacks import CarliniWagnerL2
 import numpy as np
 from PIL import Image
 
@@ -72,13 +72,8 @@ def save_images(images, filenames, output_dir):
       img = (((images[i, :, :, :] + 1.0) * 0.5) * 255.0).astype(np.uint8)
       Image.fromarray(img).save(f, format='PNG')
 
-def discriminator():
-    model = InceptionV3(weights='imagenet')
-    return model
-
 class InceptionModel(object):
   """Model class for CleverHans library."""
-
   def __init__(self, num_classes):
     self.num_classes = num_classes
     self.built = False
@@ -100,7 +95,6 @@ def main(_):
   # Images for inception classifier are normalized to be in [-1, 1] interval,
   # eps is a difference between pixels so it should be in [0, 2] interval.
   # Renormalizing epsilon from [0, 255] to [0, 2].
-  eps = 2.0 * FLAGS.max_epsilon / 255.0
   batch_shape = [1, FLAGS.image_height, FLAGS.image_width, 3]
   num_classes = 1001
 
@@ -112,11 +106,16 @@ def main(_):
     model = InceptionModel(num_classes)
     probs = model(x_input)
 
-    jsma = FastGradientMethod(model)
-    jsma_params = {'theta': 1., 'gamma': 0.1,
-                   'clip_min': -1., 'clip_max': 1.,
-                   'y_target': None}
-    x_adv = jsma.generate(x_input, **jsma_params)
+    cw = CarliniWagnerL2(model)
+    cw_params = {'binary_search_steps': 1,
+                    'max_iterations': 5,
+                    'learning_rate': 0.1,
+                    'batch_size': 1,
+                    'initial_const': 10,
+                    'clip_min':-1., 
+                    'clip_max': 1.}
+
+    x_adv = cw.generate(x=x_input, **cw_params)
 
     # Run computation
     saver = tf.train.Saver(slim.get_model_variables())
@@ -127,13 +126,8 @@ def main(_):
 
     with tf.train.MonitoredSession(session_creator=session_creator) as sess:
       for filenames, images in load_images(FLAGS.input_dir, batch_shape):
-        for i in range(3):
-          print('iter:', i)
-          if i == 0:
-            adv_images = sess.run(x_adv, feed_dict={x_input: images})
-          else:
-            adv_images = sess.run(x_adv, feed_dict={x_input: adv_images})
-
+        adv_images = sess.run(x_adv, feed_dict={x_input: images})
+"""
         prob = sess.run(probs, feed_dict={x_input: images})
         original_idx = np.argmax(prob)
         print('original idx:', original_idx, 'prob:', prob[0][original_idx])
@@ -142,7 +136,6 @@ def main(_):
         adv_idx = np.argmax(adv_prob)
         print('adv idx:', adv_idx, 'prob:', adv_prob[0][adv_idx])
         save_images(adv_images, filenames, FLAGS.output_dir)
-  
-
+  """
 if __name__ == '__main__':
   tf.app.run()
